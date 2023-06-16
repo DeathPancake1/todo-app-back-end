@@ -16,6 +16,7 @@ const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
 const body_parser_1 = __importDefault(require("body-parser"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
 app.use(body_parser_1.default.json());
@@ -23,13 +24,17 @@ const port = process.env.PORT;
 dotenv_1.default.config();
 app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const credentials = req.body;
-    console.log(credentials);
     try {
+        // Generate a salt for password hashing
+        const saltRounds = 10;
+        const salt = yield bcrypt_1.default.genSalt(saltRounds);
+        // Encrypt the password with the salt and the KEY from .env
+        const encryptedPassword = yield bcrypt_1.default.hash(credentials.password, `${salt}${process.env.KEY}`);
         const user = yield prisma.user.create({
             data: {
                 email: credentials.email,
                 username: credentials.username,
-                password: credentials.password,
+                password: encryptedPassword,
             },
         });
         console.log(user);
@@ -42,12 +47,12 @@ app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* 
 }));
 app.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
-    // Query the user with the provided username
+    // Query the user with the provided email
     const user = yield prisma.user.findUnique({
         where: { email },
     });
-    // Check if the user exists and the password matches
-    if (user && user.password === password) {
+    // Check if the user exists and compare the passwords
+    if (user && (yield bcrypt_1.default.compare(password, user.password))) {
         // Successful login
         res.status(200).json({ message: 'Login successful' });
     }

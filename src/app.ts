@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { Prisma, PrismaClient } from '@prisma/client'
 import bodyParser from 'body-parser';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient()
 const app = express();
@@ -11,14 +12,20 @@ dotenv.config();
 
 app.post('/register', async (req, res) => {
   const credentials = req.body;
-  console.log(credentials);
 
   try {
+    // Generate a salt for password hashing
+    const saltRounds = 10;
+    const salt = await bcrypt.genSalt(saltRounds);
+
+    // Encrypt the password with the salt and the KEY from .env
+    const encryptedPassword = await bcrypt.hash(credentials.password, `${salt}${process.env.KEY}`);
+
     const user = await prisma.user.create({
       data: {
         email: credentials.email,
         username: credentials.username,
-        password: credentials.password,
+        password: encryptedPassword,
       },
     });
 
@@ -32,22 +39,22 @@ app.post('/register', async (req, res) => {
 });
   
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-  
-    // Query the user with the provided username
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-  
-    // Check if the user exists and the password matches
-    if (user && user.password === password) {
-      // Successful login
-      res.status(200).json({ message: 'Login successful' });
-    } else {
-      // Failed login
-      res.status(401).json({ message: 'Invalid credentials' });
-    }
-  });  
+  const { email, password } = req.body;
+
+  // Query the user with the provided email
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  // Check if the user exists and compare the passwords
+  if (user && await bcrypt.compare(password, user.password)) {
+    // Successful login
+    res.status(200).json({ message: 'Login successful' });
+  } else {
+    // Failed login
+    res.status(401).json({ message: 'Invalid credentials' });
+  }
+});
 
   app.post('/addTodo', async (req, res) => {
     const { email, todoName } = req.body;
