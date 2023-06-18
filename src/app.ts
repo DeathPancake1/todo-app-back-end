@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import bodyParser from 'body-parser';
@@ -17,7 +17,8 @@ const generateToken = (payload) => {
 };
 
 // Middleware to validate JWT token
-const verifyToken = (req, res, next) => {
+// eslint-disable-next-line @typescript-eslint/ban-types
+const verifyToken = (req: CustomRequest, res: Response, next: Function) => {
   const token = req.headers['authorization'];
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -26,13 +27,21 @@ const verifyToken = (req, res, next) => {
     if (err) {
       return res.status(401).json({ error: 'Invalid token' });
     }
-    req.user = decoded;
+    req.user = decoded as UserPayload;
     next();
   });
 };
 
+// Custom interface extending Request
+interface CustomRequest extends Request {
+  user?: UserPayload;
+}
 
-app.post('/register', async (req, res) => {
+interface UserPayload {
+  email: string;
+}
+
+app.post('/register', async (req: Request, res: Response) => {
   const credentials = req.body;
 
   try {
@@ -41,7 +50,10 @@ app.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(saltRounds);
 
     // Encrypt the password with the salt and the KEY from .env
-    const encryptedPassword = await bcrypt.hash(credentials.password, `${salt}${process.env.KEY}`);
+    const encryptedPassword = await bcrypt.hash(
+      credentials.password,
+      `${salt}${process.env.KEY}`
+    );
 
     await prisma.user.create({
       data: {
@@ -51,7 +63,6 @@ app.post('/register', async (req, res) => {
       },
     });
 
-
     res.send('Registration successful').status(200);
   } catch (error) {
     console.error(error);
@@ -59,7 +70,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   // Query the user with the provided email
@@ -68,7 +79,7 @@ app.post('/login', async (req, res) => {
   });
 
   // Check if the user exists and compare the passwords
-  if (user && await bcrypt.compare(password, user.password)) {
+  if (user && (await bcrypt.compare(password, user.password))) {
     // Successful login
     const payload = { email: user.email }; // Customize the payload as needed
     const token = generateToken(payload);
@@ -79,8 +90,9 @@ app.post('/login', async (req, res) => {
   }
 });
 
-app.post('/addTodo', verifyToken, async (req, res) => {
-  const { email, todoName } = req.body;
+app.post('/addTodo', verifyToken, async (req: CustomRequest, res: Response) => {
+  const { todoName } = req.body;
+  const { email } = req.user as UserPayload; // Access the email from the decoded token
 
   try {
     // Check if the user exists
@@ -110,8 +122,8 @@ app.post('/addTodo', verifyToken, async (req, res) => {
   }
 });
 
-app.post('/todos', verifyToken, async (req, res) => {
-  const { email } = req.body;
+app.post('/todos', verifyToken, async (req: CustomRequest, res: Response) => {
+  const { email } = req.user as UserPayload; // Access the email from the decoded token
   try {
     const todos = await prisma.todo.findMany({
       where: { author: { email } },
@@ -123,7 +135,7 @@ app.post('/todos', verifyToken, async (req, res) => {
   }
 });
 
-app.put('/todos/:id', verifyToken, async (req, res) => {
+app.put('/todos/:id', verifyToken, async (req: CustomRequest, res: Response) => {
   const { id } = req.params;
   const { finished } = req.body;
 

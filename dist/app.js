@@ -28,6 +28,7 @@ const generateToken = (payload) => {
     return jsonwebtoken_1.default.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 };
 // Middleware to validate JWT token
+// eslint-disable-next-line @typescript-eslint/ban-types
 const verifyToken = (req, res, next) => {
     const token = req.headers['authorization'];
     if (!token) {
@@ -49,7 +50,7 @@ app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* 
         const salt = yield bcrypt_1.default.genSalt(saltRounds);
         // Encrypt the password with the salt and the KEY from .env
         const encryptedPassword = yield bcrypt_1.default.hash(credentials.password, `${salt}${process.env.KEY}`);
-        const user = yield prisma.user.create({
+        yield prisma.user.create({
             data: {
                 email: credentials.email,
                 username: credentials.username,
@@ -82,7 +83,8 @@ app.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 }));
 app.post('/addTodo', verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email, todoName } = req.body;
+    const { todoName } = req.body;
+    const { email } = req.user; // Access the email from the decoded token
     try {
         // Check if the user exists
         const user = yield prisma.user.findUnique({
@@ -109,7 +111,7 @@ app.post('/addTodo', verifyToken, (req, res) => __awaiter(void 0, void 0, void 0
     }
 }));
 app.post('/todos', verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email } = req.body;
+    const { email } = req.user; // Access the email from the decoded token
     try {
         const todos = yield prisma.todo.findMany({
             where: { author: { email } },
