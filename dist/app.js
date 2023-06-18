@@ -17,11 +17,30 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
 const body_parser_1 = __importDefault(require("body-parser"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
 app.use(body_parser_1.default.json());
 const port = process.env.PORT;
 dotenv_1.default.config();
+// Function to generate JWT token
+const generateToken = (payload) => {
+    return jsonwebtoken_1.default.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+};
+// Middleware to validate JWT token
+const verifyToken = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+        req.user = decoded;
+        next();
+    });
+};
 app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const credentials = req.body;
     try {
@@ -37,7 +56,6 @@ app.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 password: encryptedPassword,
             },
         });
-        console.log(user);
         res.send('Registration successful').status(200);
     }
     catch (error) {
@@ -54,14 +72,16 @@ app.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     // Check if the user exists and compare the passwords
     if (user && (yield bcrypt_1.default.compare(password, user.password))) {
         // Successful login
-        res.status(200).json({ message: 'Login successful' });
+        const payload = { email: user.email }; // Customize the payload as needed
+        const token = generateToken(payload);
+        res.status(200).json({ message: 'Login successful', token });
     }
     else {
         // Failed login
         res.status(401).json({ message: 'Invalid credentials' });
     }
 }));
-app.post('/addTodo', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/addTodo', verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, todoName } = req.body;
     try {
         // Check if the user exists
@@ -79,7 +99,7 @@ app.post('/addTodo', (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 author: { connect: { email: email } },
                 title: todoName,
                 finished: false,
-            }, // Explicitly define the type as TodoCreateInput
+            },
         });
         res.status(200).json(newTodo);
     }
@@ -88,7 +108,7 @@ app.post('/addTodo', (req, res) => __awaiter(void 0, void 0, void 0, function* (
         res.status(500).send('An error occurred while adding a todo');
     }
 }));
-app.post('/todos', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/todos', verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email } = req.body;
     try {
         const todos = yield prisma.todo.findMany({
@@ -98,10 +118,10 @@ app.post('/todos', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
     catch (error) {
         console.error(error);
-        res.status(500).send('An error occurred while adding a todo');
+        res.status(500).send('An error occurred while retrieving todos');
     }
 }));
-app.put('/todos/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.put('/todos/:id', verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { finished } = req.body;
     try {
