@@ -12,10 +12,11 @@ This is the backend for a todo application. It serves login/register and todo li
 You can assign
 ```
 PORT=3000
-DATABSE_URL="file:./dev.db"
+DATABASE_URL="file:./dev.db"
 KEY="DEMOKEY"
 JWT_SECRET="SECRET_KEY"
 ```
+- Run command ``` npx prisma migrate dev --preview-feature ``` to run migration and write migration name
 - Run command ``` npx prisma generate ``` to initiate the database.
 - Run command ``` npm run start ``` in the terminal to start the server on the port you assigned
 
