@@ -28,6 +28,7 @@ JWT_SECRET="SECRET_KEY"
 - dotenv
 - bodyparser
 - jsonwebtoken
+- eslint
 
 ## API's
 
@@ -80,3 +81,8 @@ The database used with prisma.js here is sqllite, it is stored in the dev.db fil
 - finished :boolean
 - author :User
 - authorId :int
+
+## ESlint configuration
+
+- import modules
+- Enforce types
